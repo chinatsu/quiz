@@ -3,6 +3,8 @@ use tide::prelude::*;
 use sqlx::prelude::*;
 use sqlx::postgres::Postgres;
 use tide_sqlx::{SQLxMiddleware, SQLxRequestExt};
+use dotenv::dotenv;
+use std::env;
 
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -13,8 +15,11 @@ struct Question {
 
 #[async_std::main]
 async fn main() -> tide::Result<()> {
+    dotenv().ok();
+
     let mut app = tide::new();
-    app.with(SQLxMiddleware::<Postgres>::new("postgres://postgres:hunter2@localhost:2345/quiz").await?);
+
+    app.with(SQLxMiddleware::<Postgres>::new(&env::var("DATABASE_URL")?).await?);
     app.at("/questions/").get(get_questions);
     app.at("/questions/add").post(create_question);
     app.listen("127.0.0.1:3000").await?;

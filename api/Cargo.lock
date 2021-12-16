@@ -78,6 +78,7 @@ name = "api"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "dotenv",
  "serde",
  "sqlx",
  "tide",
