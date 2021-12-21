@@ -1,10 +1,10 @@
 use tide::Request;
+use async_std::prelude::*;
 use tide::prelude::*;
-use sqlx::prelude::*;
-use sqlx::postgres::Postgres;
-use tide_sqlx::{SQLxMiddleware, SQLxRequestExt};
+use sqlx::postgres::{PgPool, PgPoolOptions};
 use dotenv::dotenv;
 use std::env;
+use tide_websockets::{Message, WebSocket, WebSocketConnection};
 
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -13,22 +13,43 @@ struct Question {
     answer: i32,
 }
 
+#[derive(Clone)]
+struct State {
+    pool: PgPool
+}
+
+
 #[async_std::main]
 async fn main() -> tide::Result<()> {
     dotenv().ok();
 
-    let mut app = tide::new();
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&env::var("DATABASE_URL")?).await?;
+    let state = State { pool };
 
-    app.with(SQLxMiddleware::<Postgres>::new(&env::var("DATABASE_URL")?).await?);
+    let mut app = tide::with_state(state);
     app.at("/questions/").get(get_questions);
     app.at("/questions/add").post(create_question);
+    app.at("/quiz/").get(WebSocket::new(get_quiz));
     app.listen("127.0.0.1:3000").await?;
     Ok(())
 }
 
-async fn create_question(mut req: Request<()>) -> tide::Result {
+async fn get_quiz(_req: Request<State>, mut stream: WebSocketConnection) -> tide::Result<()> {
+    stream.send_string(format!("Welcome to the quiz!")).await?;
+    while let Some(Ok(Message::Text(input))) = stream.next().await {
+        let output: String = input.chars().rev().collect();
+        stream
+            .send_string(format!("{} | {}", &input, &output))
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn create_question(mut req: Request<State>) -> tide::Result {
     let question: Question = req.body_json().await?;
-    let mut pg_conn = req.sqlx_conn::<Postgres>().await;
 
     let new_question = sqlx::query_as!(
         Question,
@@ -40,17 +61,15 @@ async fn create_question(mut req: Request<()>) -> tide::Result {
         question.question,
         question.answer,
     )
-    .fetch_one(pg_conn.acquire().await?)
+    .fetch_one(&req.state().pool)
     .await?;
 
     Ok(json!(new_question).into())
 }
 
-async fn get_questions(req: Request<()>) -> tide::Result {
-    let mut pg_conn = req.sqlx_conn::<Postgres>().await;
-
+async fn get_questions(req: Request<State>) -> tide::Result {
     let questions = sqlx::query_as!(Question, "SELECT * FROM question")
-        .fetch_all(pg_conn.acquire().await?)
+            .fetch_all(&req.state().pool)
         .await?;
     
     Ok(json!(questions).into())
