@@ -10,7 +10,7 @@ use tide_websockets::{Message, WebSocket, WebSocketConnection};
 #[derive(Debug, Deserialize, Serialize)]
 struct Question {
     question: String,
-    answer: i32,
+    answer: String,
 }
 
 #[derive(Clone)]
@@ -36,15 +36,35 @@ async fn main() -> tide::Result<()> {
     Ok(())
 }
 
-async fn get_quiz(_req: Request<State>, mut stream: WebSocketConnection) -> tide::Result<()> {
-    stream.send_string(format!("Welcome to the quiz!")).await?;
-    while let Some(Ok(Message::Text(input))) = stream.next().await {
-        let output: String = input.chars().rev().collect();
-        stream
-            .send_string(format!("{} | {}", &input, &output))
-            .await?;
-    }
+async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> tide::Result<()> {
+    let questions = sqlx::query_as!(
+            Question, 
+            "SELECT * FROM question"
+        ).fetch_all(&req.state().pool).await?;
+    stream.send_string(
+        format!("Welcome to the quiz! There are {} questions to answer", 
+            questions.len()
+        )
+    ).await?;
 
+    let mut score = 0u32;
+
+    for (idx, question) in questions.iter().enumerate() {
+        stream.send_string(format!("Question {}: {}", idx+1, question.question)).await?;
+        let answer = match stream.next().await {
+            Some(Ok(Message::Text(input))) => input.trim().to_string(),
+            Some(_) => "".into(),
+            None => "".into(),
+        };
+        if answer.to_ascii_lowercase() == question.answer.to_ascii_lowercase() {
+            score += 1;
+            stream.send_string("That's the right answer!".into()).await?;
+        } else {
+            stream.send_string(format!("That's is the wrong answer! The right answer was {}", question.answer)).await?;
+        }
+    }
+    stream.send_string(format!("Thanks for playing! You scored {} out of {}", score, questions.len())).await?;
+    stream.send(Message::Close(None)).await?;
     Ok(())
 }
 
