@@ -15,6 +15,7 @@ const Quiz = () => {
   const [score, setScore] = useState<number>(0);
   const [total, setTotal] = useState<number>(0);
   const [correctAnswers, setCorrectAnswers] = useState<number[]>([]);
+  const [answered, setAnswered] = useState(true);
 
   const {
     sendMessage,
@@ -30,13 +31,13 @@ const Quiz = () => {
       }
       let object = JSON.parse(lastMessage.data);
       if (object.message_type === "Quiz") {
-
         setTitle(object.name);
-          setDescription(object.description);
-          setTotal(object.num_questions);
-          setEnded(false);
+        setDescription(object.description);
+        setTotal(object.num_questions);
+        setEnded(false);
       } else if (object.message_type === "Question") {
         setCorrectAnswers([]);
+        setAnswered(false);
         setCurrentQuestion(object);
       } else if (object.message_type === "Result") {
         setScore(object.score);
@@ -49,6 +50,8 @@ const Quiz = () => {
   }, [lastMessage]);
 
   const handleAnswer = (index: number, answer: number) => {
+    setAnswered(true);
+    console.log(answered);
     sendMessage(JSON.stringify({index, answer}));
   }
 
@@ -69,7 +72,10 @@ const Quiz = () => {
         <div className={styles.buttonRow}>
         {currentQuestion.alternatives
           .map(a => 
-            <Button key={`alternative-${currentQuestion.index}-${a.index}`} className={correctAnswers.length > 0 ? (correctAnswers.includes(a.index) ? styles.correct : styles.wrong) : ""} onClick={e => handleAnswer(currentQuestion.index, a.index)}>{a.text}</Button>
+            <Button disabled={answered} key={`alternative-${currentQuestion.index}-${a.index}`} className={
+                correctAnswers.length > 0 
+                ? (correctAnswers.includes(a.index) ? styles.correct : styles.wrong) 
+                : ""} onClick={() => answered ? null : handleAnswer(currentQuestion.index, a.index)}>{a.text}</Button>
           )
         }
         </div>

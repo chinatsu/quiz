@@ -30,7 +30,28 @@
   color: var(--navds-semantic-color-text-inverted);
 }
 
+.correct:focus:disabled {
+  background-color: var(--navds-semantic-color-feedback-success-border);
+  color: var(--navds-semantic-color-text-inverted);
+}
+
+.correct:hover {
+  background-color: var(--navds-semantic-color-feedback-success-border);
+  color: var(--navds-semantic-color-text-inverted);
+}
+
 .wrong {
   background-color: var(--navds-semantic-color-feedback-danger-background);
   color: var(--navds-semantic-color-text);
+}
+
+
+.wrong:focus:disabled {
+  background-color: var(--navds-semantic-color-feedback-danger-border);
+  color: var(--navds-semantic-color-text-inverted);
+}
+
+.wrong:focus {
+  background-color: var(--navds-semantic-color-feedback-danger-border);
+  color: var(--navds-semantic-color-text-inverted);
 }
