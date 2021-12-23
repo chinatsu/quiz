@@ -47,5 +47,5 @@ note that the endpoint uses the qui_id-field, your first quiz will likely have a
 once you've created a few questions, you can play the quiz with websocat or something similar to interact with websockets.
 
 ```
-websocat ws://localhost:3000/quiz/1
+websocat -E ws://localhost:3000/quiz/1
 ```

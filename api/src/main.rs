@@ -6,6 +6,13 @@ use tide::prelude::*;
 use tide::Request;
 use tide_websockets::{Message, WebSocket, WebSocketConnection};
 
+#[derive(Debug, Deserialize, Serialize)]
+struct OutgoingQuiz {
+    qui_id: i32,
+    name: String,
+    description: String,
+    questions: Vec<IncomingQuestion>,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct IncomingAnswer {
@@ -67,6 +74,7 @@ async fn main() -> tide::Result<()> {
     let mut app = tide::with_state(state);
     app.at("/create/quiz").post(create_quiz);
     app.at("/create/quiz/:q/question").post(create_question);
+    app.at("/quiz/:q/answers").get(get_answers);
     app.at("/quiz/:q").get(WebSocket::new(get_quiz));
     app.listen("127.0.0.1:3000").await?;
     Ok(())
@@ -213,4 +221,54 @@ async fn create_question(mut req: Request<State>) -> tide::Result {
     }
 
     Ok(json!(new_question).into())
+}
+
+async fn get_answers(req: Request<State>) -> tide::Result {
+    let quiz_id: i32 = req.param("q")?.parse()?;
+    let quiz = sqlx::query_as!(
+        Quiz,
+        "SELECT * FROM quizes WHERE qui_id = $1",
+        quiz_id
+    )
+    .fetch_one(&req.state().pool)
+    .await?;
+
+    let questions = sqlx::query_as!(
+        Question,
+        "SELECT * FROM questions WHERE qui_id = $1",
+        quiz_id
+    )
+    .fetch_all(&req.state().pool)
+    .await?;
+    let mut internal_questions = Vec::new();
+    for q in questions.iter() {
+        let answers = sqlx::query_as!(
+            Answer,
+            "SELECT * FROM answers WHERE que_id = $1",
+            q.que_id
+        )
+        .fetch_all(&req.state().pool)
+        .await?;
+
+        internal_questions.push(IncomingQuestion {
+            que_text: q.que_text.clone(),
+            image_url: q.image_url.clone(),
+            answers: answers
+            .iter()
+            .map(|a| IncomingAnswer {
+                ans_text: a.ans_text.clone(),
+                correct: a.correct
+            }).collect()
+    
+        });
+    }
+
+    let outgoing_quiz = OutgoingQuiz {
+        qui_id: quiz.qui_id,
+        name: quiz.name,
+        description: quiz.description,
+        questions: internal_questions
+    };
+
+    Ok(json!(outgoing_quiz).into())
 }
