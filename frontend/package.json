@@ -1,0 +1,30 @@
+{
+  "name": "quiz",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@types/websocket": "^1.0.4",
+    "@types/ws": "^8.2.2",
+    "fs": "^0.0.1-security",
+    "net": "^1.0.2",
+    "next": "12.0.7",
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "react-use-websocket": "^2.9.1",
+    "tls": "^0.0.1",
+    "utf-8-validate": "^5.0.7",
+    "ws": "^8.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "17.0.4",
+    "@types/react": "17.0.38",
+    "eslint": "8.5.0",
+    "eslint-config-next": "12.0.7",
+    "typescript": "4.5.4"
+  }
+}

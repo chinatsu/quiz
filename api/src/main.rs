@@ -76,7 +76,7 @@ async fn main() -> tide::Result<()> {
     app.at("/create/quiz/:q/question").post(create_question);
     app.at("/quiz/:q/answers").get(get_answers);
     app.at("/quiz/:q").get(WebSocket::new(get_quiz));
-    app.listen("127.0.0.1:3000").await?;
+    app.listen("0.0.0.0:3001").await?;
     Ok(())
 }
 
