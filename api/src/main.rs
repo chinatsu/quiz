@@ -1,7 +1,7 @@
 use async_std::prelude::*;
 use dotenv::dotenv;
 use sqlx::postgres::{PgPool, PgPoolOptions};
-use std::env;
+use std::{env, thread, time};
 use tide::prelude::*;
 use tide::Request;
 use tide_websockets::{Message, WebSocket, WebSocketConnection};
@@ -47,6 +47,12 @@ struct WebsocketResult {
     correct: bool,
     score: u32,
     correct_answers: Vec<usize>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct IncomingWebsocketAnswer {
+    index: usize,
+    answer: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -177,34 +183,42 @@ async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> tide:
 
         let correct_answers: Vec<usize> = answers
             .iter()
-            .filter(|ans| match ans.correct {
+            .enumerate()
+            .filter(|(_, ans)| match ans.correct {
                 Some(correct) => correct,
                 None => false,
             })
-            .enumerate()
             .map(|(i, _)| i+1)
             .collect();
 
         // todo: use a loop to set submitted_answer once Message has arrived in the stream
         // or something more sensible than this
-        let submitted_answer: usize = match stream.next().await {
-            Some(Ok(Message::Text(input))) => input.trim().parse()?,
-            Some(_) => 0,
-            None => 0,
-        };
+        let submitted_answer: IncomingWebsocketAnswer;
 
-        if submitted_answer == 0 {
+        loop {
+            let ans: Option<IncomingWebsocketAnswer> = match stream.next().await {
+                Some(Ok(Message::Text(input))) => Some(serde_json::from_str(&input)?),
+                _ => None
+            };
+            if let Some(answer) = ans {
+                submitted_answer = answer;
+                break;
+            }
+        }
+
+        if submitted_answer.answer == 0 || submitted_answer.answer > answers.len() || submitted_answer.index != idx+1 {
             stream
-                .send_string("Something weird happened".into())
+                .send_string("This is supposed to never happen".into())
                 .await?;
             continue;
         }
 
-        let correct_answer = correct_answers.contains(&submitted_answer);
+        let correct_answer = correct_answers.contains(&submitted_answer.answer);
         if correct_answer {
             score += 1;
-        } 
+        }
 
+        
         stream.send_json(&WebsocketResult {
             message_type: WebsocketMessage::Result,
             index: idx+1,
@@ -212,6 +226,8 @@ async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> tide:
             score: score,
             correct_answers: correct_answers,
         }).await?;
+        
+        thread::sleep(time::Duration::new(3, 0));
     }
     stream
         .send_json(&WebsocketEndResult {

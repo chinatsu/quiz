@@ -1,0 +1,36 @@
+.container {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 79.5rem;
+  padding: var(--navds-spacing-4);
+}
+
+.header {
+    padding: var(--navds-spacing-5);
+    margin-bottom: var(--navds-spacing-6);
+    border-bottom: 1px solid var(--navds-semantic-color-divider);
+}
+
+.buttonRow {
+  display: flex;
+  flex-direction: column;
+}
+
+.buttonRow button {
+  margin: var(--navds-spacing-2);
+}
+
+.correct {
+  background-color: var(--navds-semantic-color-feedback-success-background);
+  color: var(--navds-semantic-color-text);
+}
+
+.correct:focus {
+  background-color: var(--navds-semantic-color-feedback-success-border);
+  color: var(--navds-semantic-color-text-inverted);
+}
+
+.wrong {
+  background-color: var(--navds-semantic-color-feedback-danger-background);
+  color: var(--navds-semantic-color-text);
+}
