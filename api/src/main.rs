@@ -6,12 +6,59 @@ use tide::prelude::*;
 use tide::Request;
 use tide_websockets::{Message, WebSocket, WebSocketConnection};
 
+
+#[derive(Debug, Deserialize, Serialize)]
+enum WebsocketMessage {
+    Quiz,
+    Question,
+    Result,
+    End,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct OutgoingQuiz {
     qui_id: i32,
     name: String,
     description: String,
     questions: Vec<IncomingQuestion>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketQuiz {
+    message_type: WebsocketMessage,
+    name: String,
+    description: String,
+    num_questions: usize
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketQuestion {
+    message_type: WebsocketMessage,
+    index: usize,
+    text: String,
+    image_url: Option<String>,
+    alternatives: Vec<WebsocketAnswer>
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketResult {
+    message_type: WebsocketMessage,
+    index: usize,
+    correct: bool,
+    score: u32,
+    correct_answers: Vec<usize>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketEndResult {
+    message_type: WebsocketMessage,
+    score: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketAnswer {
+    index: usize,
+    text: String
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -85,13 +132,6 @@ async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> tide:
     let quiz = sqlx::query_as!(Quiz, "SELECT * FROM quizes WHERE qui_id = $1", quiz_id)
         .fetch_one(&req.state().pool)
         .await?;
-    stream
-        .send_string(format!("Welcome to {}!", quiz.name))
-        .await?;
-
-    stream
-        .send_string(format!("Use associated numbers to enter your answers."))
-        .await?;
     let questions = sqlx::query_as!(
         Question,
         "SELECT * FROM questions WHERE qui_id = $1",
@@ -100,12 +140,19 @@ async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> tide:
     .fetch_all(&req.state().pool)
     .await?;
 
+    stream
+        .send_json(&WebsocketQuiz {
+            message_type: WebsocketMessage::Quiz,
+            name: quiz.name,
+            description: quiz.description,
+            num_questions: questions.len(),
+        })
+        .await?;
+    
+
     let mut score = 0u32;
 
     for (idx, question) in questions.iter().enumerate() {
-        stream
-            .send_string(format!("Question {}: {}", idx + 1, question.que_text))
-            .await?;
         let answers = sqlx::query_as!(
             Answer,
             "SELECT * FROM answers WHERE que_id = $1",
@@ -114,20 +161,30 @@ async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> tide:
         .fetch_all(&req.state().pool)
         .await?;
 
-        let correct_answers: Vec<String> = answers
+        stream
+            .send_json(&WebsocketQuestion {
+                message_type: WebsocketMessage::Question,
+                index: idx+1,
+                text: question.que_text.clone(),
+                image_url: question.image_url.clone(),
+                alternatives: answers.iter().enumerate().map(|(i, a)| WebsocketAnswer {
+                    index: i+1,
+                    text: a.ans_text.clone()
+                }).collect()
+            })
+            .await?;
+
+
+        let correct_answers: Vec<usize> = answers
             .iter()
             .filter(|ans| match ans.correct {
                 Some(correct) => correct,
                 None => false,
             })
-            .map(|ans| ans.ans_text.to_ascii_lowercase().to_string())
+            .enumerate()
+            .map(|(i, _)| i+1)
             .collect();
 
-        for (jdx, ans) in answers.iter().enumerate() {
-            stream
-                .send_string(format!("\t{}: {}", jdx + 1, ans.ans_text))
-                .await?;
-        }
         // todo: use a loop to set submitted_answer once Message has arrived in the stream
         // or something more sensible than this
         let submitted_answer: usize = match stream.next().await {
@@ -142,28 +199,25 @@ async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> tide:
                 .await?;
             continue;
         }
-        let selected_answer = answers[submitted_answer-1].ans_text.clone();
-        if correct_answers.contains(&selected_answer.to_ascii_lowercase()) {
+
+        let correct_answer = correct_answers.contains(&submitted_answer);
+        if correct_answer {
             score += 1;
-            stream
-                .send_string("That's the right answer!".into())
-                .await?;
-        } else {
-            let answer_list = correct_answers.join(" or ");
-            stream
-                .send_string(format!(
-                    "That's is the wrong answer! The right answer was {}",
-                    answer_list
-                ))
-                .await?;
-        }
+        } 
+
+        stream.send_json(&WebsocketResult {
+            message_type: WebsocketMessage::Result,
+            index: idx+1,
+            correct: correct_answer,
+            score: score,
+            correct_answers: correct_answers,
+        }).await?;
     }
     stream
-        .send_string(format!(
-            "Thanks for playing! You scored {} out of {}",
-            score,
-            questions.len()
-        ))
+        .send_json(&WebsocketEndResult {
+            message_type: WebsocketMessage::End,
+            score: score,
+        })
         .await?;
     stream.send(Message::Close(None)).await?;
     Ok(())

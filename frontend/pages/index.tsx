@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
 
 const Quiz = () => {
-  const [socketUrl, setSocketUrl] = useState('ws://192.168.188.66:3001/quiz/1');
+  const [socketUrl] = useState('ws://192.168.188.66:3001/quiz/1');
   const [messageHistory, setMessageHistory] = useState<any>([]);
 
   const {
