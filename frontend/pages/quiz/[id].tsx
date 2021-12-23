@@ -1,11 +1,13 @@
 import { Alert, Button, Heading, Ingress } from '@navikt/ds-react';
 import React, { useState, useEffect } from 'react';
-import useWebSocket, { ReadyState } from 'react-use-websocket';
+import useWebSocket from 'react-use-websocket';
 import "@navikt/ds-css";
-import styles from '../styles/Quiz.module.css';
+import styles from '../../styles/Quiz.module.css';
+import { useRouter } from 'next/router';
 
 const Quiz = () => {
-  const [socketUrl] = useState('ws://192.168.188.66:3001/quiz/0');
+  const router = useRouter();
+  const { id } = router.query;
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
@@ -17,8 +19,7 @@ const Quiz = () => {
   const {
     sendMessage,
     lastMessage,
-    readyState,
-  } = useWebSocket(socketUrl);
+  } = useWebSocket(`ws://192.168.188.66:3001/quiz/${id}`);
 
 
   useEffect(() => {
@@ -29,7 +30,8 @@ const Quiz = () => {
       }
       let object = JSON.parse(lastMessage.data);
       if (object.message_type === "Quiz") {
-          setTitle(object.name);
+
+        setTitle(object.name);
           setDescription(object.description);
           setTotal(object.num_questions);
           setEnded(false);
