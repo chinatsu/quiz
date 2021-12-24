@@ -129,29 +129,40 @@ pub async fn play_session(
     .await?;
 
     let quiz = flat_to_nested_quiz(flat_quiz);
-    let new_player = sqlx::query_as!(
+    let player = sqlx::query_as!(
         db::Player,
         r#"
-        INSERT INTO players (session_id, score, name)
-        VALUES ($1, 0, $2)
-        RETURNING player_id, session_id, score, finished, name
+        SELECT * FROM players WHERE session_id = $1 AND name = $2
         "#,
         session_id,
         name
     )
-    .fetch_one(&req.state().pool)
+    .fetch_optional(&req.state().pool)
     .await?;
+    if player.is_none() {
+        let new_player = sqlx::query_as!(
+            db::Player,
+            r#"
+        INSERT INTO players (session_id, score, name)
+        VALUES ($1, 0, $2)
+        RETURNING player_id, session_id, score, finished, name
+        "#,
+            session_id,
+            name
+        )
+        .fetch_one(&req.state().pool)
+        .await?;
 
-    let score = play_quiz(quiz, &mut stream).await?;
+        let score = play_quiz(quiz, &mut stream).await?;
 
-    sqlx::query!(
-        "UPDATE players SET score = $1, finished = true WHERE player_id = $2",
-        score as i32,
-        new_player.player_id
-    )
-    .execute(&req.state().pool)
-    .await?;
-
+        sqlx::query!(
+            "UPDATE players SET score = $1, finished = true WHERE player_id = $2",
+            score as i32,
+            new_player.player_id
+        )
+        .execute(&req.state().pool)
+        .await?;
+    }
     loop {
         let players = sqlx::query_as!(
             db::Player,
