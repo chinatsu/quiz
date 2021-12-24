@@ -25,7 +25,6 @@ async fn main() -> tide::Result<()> {
     let mut app = tide::with_state(state);
     app.at("/create/quiz").post(api::create_quiz);
     app.at("/create/quiz/:q/question").post(api::create_question);
-    app.at("/quiz/:q/answers").get(api::get_answers);
     app.at("/quiz/:q").get(WebSocket::new(ws::get_quiz));
     app.listen("0.0.0.0:3001").await?;
     Ok(())
