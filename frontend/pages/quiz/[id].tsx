@@ -72,7 +72,7 @@ const Quiz = () => {
         <div className={styles.buttonRow}>
         {currentQuestion.alternatives
           .map(a => 
-            <Button disabled={answered} key={`alternative-${currentQuestion.index}-${a.index}`} className={
+            <Button disabled={answered}  key={`alternative-${currentQuestion.index}-${a.index}`} className={
                 correctAnswers.length > 0 
                 ? (correctAnswers.includes(a.index) ? styles.correct : styles.wrong) 
                 : ""} onClick={() => answered ? null : handleAnswer(currentQuestion.index, a.index)}>{a.text}</Button>

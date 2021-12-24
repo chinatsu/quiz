@@ -2,6 +2,9 @@ use dotenv::dotenv;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::env;
 use tide_websockets::WebSocket;
+use tide::security::{CorsMiddleware, Origin};
+use http_types::headers::HeaderValue;
+
 
 mod api;
 mod db;
@@ -22,7 +25,13 @@ async fn main() -> tide::Result<()> {
         .await?;
     let state = State { pool };
 
+    let cors = CorsMiddleware::new()
+    .allow_methods("GET, POST, OPTIONS".parse::<HeaderValue>().unwrap())
+    .allow_origin(Origin::from("*"))
+    .allow_credentials(false);
+
     let mut app = tide::with_state(state);
+    app.with(cors);
     app.at("/create/quiz").post(api::create_quiz);
     app.at("/create/quiz/:q/question")
         .post(api::create_question);
