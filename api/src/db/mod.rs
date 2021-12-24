@@ -35,3 +35,18 @@ pub struct FlatQuiz {
     pub ans_text: String,
     pub correct: Option<bool>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Session {
+    pub session_id: i32,
+    pub quiz_id: i32,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Player {
+    pub session_id: i32,
+    pub player_id: i32,
+    pub score: i32,
+    pub finished: bool,
+    pub name: String,
+}

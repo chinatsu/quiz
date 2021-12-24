@@ -1,4 +1,4 @@
-use crate::{State, db};
+use crate::{db, State};
 use tide::prelude::*;
 use tide::Request;
 
@@ -21,13 +21,30 @@ struct NewQuiz {
     description: String,
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct OutgoingQuiz {
     pub qui_id: i32,
     pub name: String,
     pub description: String,
     pub questions: Vec<NewQuestion>,
+}
+
+pub async fn new_session(req: Request<State>) -> tide::Result {
+    let quiz_id: i32 = req.param("q")?.parse()?;
+
+    let new_session = sqlx::query_as!(
+        db::Session,
+        r#"
+        INSERT INTO sessions (quiz_id)
+        VALUES ($1)
+        RETURNING session_id, quiz_id
+        "#,
+        quiz_id
+    )
+    .fetch_one(&req.state().pool)
+    .await?;
+
+    Ok(json!(new_session).into())
 }
 
 pub async fn create_quiz(mut req: Request<State>) -> tide::Result {
@@ -52,7 +69,7 @@ pub async fn create_quiz(mut req: Request<State>) -> tide::Result {
 pub async fn create_question(mut req: Request<State>) -> tide::Result {
     let question: NewQuestion = req.body_json().await?;
     let quiz_id: i32 = req.param("q")?.parse()?;
-    
+
     let new_question = sqlx::query_as!(
         db::Question,
         r#"
