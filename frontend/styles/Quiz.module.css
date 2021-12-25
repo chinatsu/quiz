@@ -16,6 +16,12 @@
   flex-direction: column;
 }
 
+.image {
+  width: 100%;
+  max-width: 79.5rem;
+  height: auto;
+}
+
 .play {
   margin-top: var(--navds-spacing-4);
 }

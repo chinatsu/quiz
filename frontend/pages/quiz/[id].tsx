@@ -67,7 +67,7 @@ const Quiz = () => {
       <section>
         <Heading spacing size="large">{currentQuestion.text}</Heading>
         {currentQuestion.image_url !== null &&
-        <img src={currentQuestion.image_url} alt={currentQuestion.text} />
+        <img className={styles.image} src={currentQuestion.image_url} alt={currentQuestion.text} />
         }
         <div className={styles.buttonRow}>
         {currentQuestion.alternatives
