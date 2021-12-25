@@ -1,6 +1,7 @@
 use crate::{api, db, State};
 use async_std::prelude::*;
 use std::{thread, time};
+use sqlx::postgres::PgPool;
 use tide::prelude::*;
 use tide::Request;
 use tide_websockets::{Message, WebSocketConnection};
@@ -36,7 +37,7 @@ struct WebsocketResult {
     message_type: WebsocketMessage,
     index: usize,
     correct: bool,
-    score: u32,
+    score: i32,
     correct_answers: Vec<usize>,
 }
 
@@ -56,7 +57,7 @@ struct IncomingWebsocketAnswer {
 #[derive(Debug, Deserialize, Serialize)]
 struct WebsocketEndResult {
     message_type: WebsocketMessage,
-    score: u32,
+    score: i32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -129,6 +130,15 @@ pub async fn play_session(
     .await?;
 
     let quiz = flat_to_nested_quiz(flat_quiz);
+    
+    stream
+        .send_json(&WebsocketQuiz {
+            message_type: WebsocketMessage::Quiz,
+            name: quiz.name.clone(),
+            description: quiz.description.clone(),
+            num_questions: quiz.questions.len(),
+        })
+        .await?;
     let player = sqlx::query_as!(
         db::Player,
         r#"
@@ -139,6 +149,8 @@ pub async fn play_session(
     )
     .fetch_optional(&req.state().pool)
     .await?;
+
+    
     if player.is_none() {
         let new_player = sqlx::query_as!(
             db::Player,
@@ -153,15 +165,9 @@ pub async fn play_session(
         .fetch_one(&req.state().pool)
         .await?;
 
-        let score = play_quiz(quiz, &mut stream).await?;
+        play_quiz(quiz, &mut stream, Some(&new_player), Some(&req.state().pool)).await?;
 
-        sqlx::query!(
-            "UPDATE players SET score = $1, finished = true WHERE player_id = $2",
-            score as i32,
-            new_player.player_id
-        )
-        .execute(&req.state().pool)
-        .await?;
+        db::set_finished(new_player.player_id, &req.state().pool).await?;
     }
     loop {
         let players = sqlx::query_as!(
@@ -178,7 +184,7 @@ pub async fn play_session(
         stream
             .send_json(&WebsocketPlayerResult {
                 message_type: WebsocketMessage::PlayerResults,
-                players: players.into_iter().filter(|p| p.finished).collect(),
+                players: players,
                 game_ended: completed,
             })
             .await?;
@@ -214,23 +220,23 @@ pub async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> t
     .await?;
     let quiz = flat_to_nested_quiz(flat_quiz);
 
-    play_quiz(quiz, &mut stream).await?;
+    stream
+        .send_json(&WebsocketQuiz {
+            message_type: WebsocketMessage::Quiz,
+            name: quiz.name.clone(),
+            description: quiz.description.clone(),
+            num_questions: quiz.questions.len(),
+        })
+        .await?;
+
+    play_quiz(quiz, &mut stream, None, None).await?;
     stream.send(Message::Close(None)).await?;
 
     Ok(())
 }
 
-async fn play_quiz(quiz: api::OutgoingQuiz, stream: &mut WebSocketConnection) -> tide::Result<u32> {
-    stream
-        .send_json(&WebsocketQuiz {
-            message_type: WebsocketMessage::Quiz,
-            name: quiz.name,
-            description: quiz.description,
-            num_questions: quiz.questions.len(),
-        })
-        .await?;
-
-    let mut score = 0u32;
+async fn play_quiz(quiz: api::OutgoingQuiz, stream: &mut WebSocketConnection, player: Option<&db::Player>, pool: Option<&PgPool>) -> tide::Result<()> {
+    let mut score = 0i32;
 
     for (idx, question) in quiz.questions.iter().enumerate() {
         stream
@@ -288,6 +294,9 @@ async fn play_quiz(quiz: api::OutgoingQuiz, stream: &mut WebSocketConnection) ->
         let correct_answer = correct_answers.contains(&submitted_answer.answer);
         if correct_answer {
             score += 1;
+            if player.is_some() && pool.is_some() {
+                db::update_score(player.unwrap().player_id, score, pool.unwrap()).await?;
+            }
         }
 
         stream
@@ -308,5 +317,5 @@ async fn play_quiz(quiz: api::OutgoingQuiz, stream: &mut WebSocketConnection) ->
             score: score,
         })
         .await?;
-    Ok(score)
+    Ok(())
 }

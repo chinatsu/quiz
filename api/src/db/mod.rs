@@ -1,4 +1,5 @@
 use tide::prelude::*;
+use sqlx::postgres::PgPool;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Quiz {
@@ -49,4 +50,27 @@ pub struct Player {
     pub score: i32,
     pub finished: bool,
     pub name: String,
+}
+
+pub async fn update_score(player_id: i32, score: i32, pool: &PgPool) -> tide::Result<()> {
+    sqlx::query!(
+        "UPDATE players SET score = $1 WHERE player_id = $2",
+        score,
+        player_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn set_finished(player_id: i32, pool: &PgPool) -> tide::Result<()> {
+    sqlx::query!(
+        "UPDATE players SET finished = true WHERE player_id = $1",
+        player_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }

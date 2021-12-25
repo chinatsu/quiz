@@ -95,7 +95,7 @@ const Quiz = () => {
         </Heading>
         <ol>
           { [...currentPlayerResults.players].sort((a, b) => b.score - a.score).map(p => 
-            <li key={`player-${p.player_id}`}>{decodeURI(p.name) == player ? <b>{decodeURI(p.name)}</b> : decodeURI(p.name)}: <b>{p.score}</b></li>)}
+            <li key={`player-${p.player_id}`}>{decodeURI(p.name) == player ? <b>{decodeURI(p.name)}</b> : decodeURI(p.name)}: <b>{p.score}</b> {p.finished ? null : "(Not finished yet)"}</li>)}
         </ol>
       </section>
       }

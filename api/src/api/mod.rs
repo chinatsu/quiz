@@ -47,6 +47,20 @@ pub async fn new_session(req: Request<State>) -> tide::Result {
     Ok(json!(new_session).into())
 }
 
+pub async fn list_sessions(req: Request<State>) -> tide::Result {
+    let sessions = sqlx::query_as!(
+        db::Session,
+        r#"
+        SELECT DISTINCT s.session_id, s.quiz_id FROM sessions s
+        INNER JOIN players p ON p.session_id = s.session_id
+        WHERE p.finished = 'false'
+        "#
+    )   .fetch_all(&req.state().pool)
+        .await?;
+
+    Ok(json!(sessions).into())
+}
+
 pub async fn create_quiz(mut req: Request<State>) -> tide::Result {
     let quiz: NewQuiz = req.body_json().await?;
 
