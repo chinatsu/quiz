@@ -36,23 +36,23 @@
 }
 
 .correct:focus {
-  background-color: var(--navds-semantic-color-feedback-success-border);
-  color: var(--navds-semantic-color-text-inverted);
+  background-color: var(--navds-semantic-color-feedback-success-background);
+  color: var(--navds-semantic-color-text);
 }
 
 .correct:focus:disabled {
-  background-color: var(--navds-semantic-color-feedback-success-border);
-  color: var(--navds-semantic-color-text-inverted);
+  background-color: var(--navds-semantic-color-feedback-success-background);
+  color: var(--navds-semantic-color-text);
 }
 
 .correct:hover {
-  background-color: var(--navds-semantic-color-feedback-success-border);
-  color: var(--navds-semantic-color-text-inverted);
+  background-color: var(--navds-semantic-color-feedback-success-background);
+  color: var(--navds-semantic-color-text);
 }
 
 .wrong {
-  background-color: var(--navds-semantic-color-feedback-danger-background);
-  color: var(--navds-semantic-color-text);
+  background-color: var(--navds-semantic-color-feedback-danger-border);
+  color: var(--navds-semantic-color-text-inverted);
 }
 
 
@@ -62,6 +62,11 @@
 }
 
 .wrong:focus {
+  background-color: var(--navds-semantic-color-feedback-danger-border);
+  color: var(--navds-semantic-color-text-inverted);
+}
+
+.wrong:hover {
   background-color: var(--navds-semantic-color-feedback-danger-border);
   color: var(--navds-semantic-color-text-inverted);
 }

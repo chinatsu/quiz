@@ -4,13 +4,13 @@ use tide::Request;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct NewAnswer {
-    pub ans_text: String,
+    pub answer_text: String,
     pub correct: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct NewQuestion {
-    pub que_text: String,
+    pub question_text: String,
     pub image_url: Option<String>,
     pub answers: Vec<NewAnswer>,
 }
@@ -23,7 +23,7 @@ struct NewQuiz {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct OutgoingQuiz {
-    pub qui_id: i32,
+    pub quiz_id: i32,
     pub name: String,
     pub description: String,
     pub questions: Vec<NewQuestion>,
@@ -69,7 +69,7 @@ pub async fn create_quiz(mut req: Request<State>) -> tide::Result {
         r#"
         INSERT INTO quizes (name, description)
         VALUES ($1, $2)
-        RETURNING qui_id, name, description
+        RETURNING quiz_id, name, description
         "#,
         quiz.name,
         quiz.description,
@@ -87,11 +87,11 @@ pub async fn create_question(mut req: Request<State>) -> tide::Result {
     let new_question = sqlx::query_as!(
         db::Question,
         r#"
-        INSERT INTO questions (que_text, image_url, qui_id)
+        INSERT INTO questions (question_text, image_url, quiz_id)
         VALUES ($1, $2, $3)
-        RETURNING que_id, que_text, image_url, qui_id
+        RETURNING question_id, question_text, image_url, quiz_id
         "#,
-        question.que_text,
+        question.question_text,
         question.image_url,
         quiz_id
     )
@@ -101,12 +101,12 @@ pub async fn create_question(mut req: Request<State>) -> tide::Result {
     for answer in question.answers {
         sqlx::query!(
             r#"
-            INSERT INTO answers (ans_text, correct, que_id)
+            INSERT INTO answers (answer_text, correct, question_id)
             VALUES ($1, $2, $3)
             "#,
-            answer.ans_text,
+            answer.answer_text,
             answer.correct,
-            new_question.que_id
+            new_question.question_id
         )
         .execute(&req.state().pool)
         .await?;

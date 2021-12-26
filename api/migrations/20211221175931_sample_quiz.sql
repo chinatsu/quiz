@@ -1,15 +1,15 @@
 -- Add migration script here
-INSERT INTO quizes (qui_id, name, description)
+INSERT INTO quizes (quiz_id, name, description)
 VALUES (0, 'Sample quiz', 'It has some questions');
 
-INSERT INTO questions (que_id, que_text, qui_id)
+INSERT INTO questions (question_id, question_text, quiz_id)
 VALUES 
     (0, 'What''s the world''s largest land mammal?', 0),
     (1, 'The Godfather was released in 1972; who played the title role?', 0),
     (2, 'Zn is the symbol of which chemical element?', 0),
     (3, 'What does a Geiger Counter measure?', 0);
 
-INSERT INTO answers (ans_text, que_id, correct)
+INSERT INTO answers (answer_text, question_id, correct)
 VALUES
     ('Elephant', 0, true),
     ('Blue Whale', 0, false),

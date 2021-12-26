@@ -1,25 +1,25 @@
 -- Add migration script here
 CREATE TABLE quizes (
-    qui_id serial,
+    quiz_id serial,
     name text NOT NULL,
     description text NOT NULL,
-    PRIMARY KEY (qui_id)
+    PRIMARY KEY (quiz_id)
 );
 
 CREATE TABLE questions (
-    que_id serial,
-    que_text text NOT NULL,
+    question_id serial,
+    question_text text NOT NULL,
     image_url text,
-    qui_id int NOT NULL,
-    PRIMARY KEY (que_id),
-    CONSTRAINT fk_qui_id FOREIGN KEY (qui_id) REFERENCES quizes(qui_id) ON DELETE CASCADE
+    quiz_id int NOT NULL,
+    PRIMARY KEY (question_id),
+    CONSTRAINT fk_quiz_id FOREIGN KEY (quiz_id) REFERENCES quizes(quiz_id) ON DELETE CASCADE
 );
 
 CREATE TABLE answers (
-    ans_id serial,
-    ans_text text NOT NULL,
-    que_id int NOT NULL,
+    answer_id serial,
+    answer_text text NOT NULL,
+    question_id int NOT NULL,
     correct boolean DEFAULT false,
-    PRIMARY KEY (ans_id),
-    CONSTRAINT fk_que_id FOREIGN KEY (que_id) REFERENCES questions(que_id) ON DELETE CASCADE
+    PRIMARY KEY (answer_id),
+    CONSTRAINT fk_question_id FOREIGN KEY (question_id) REFERENCES questions(question_id) ON DELETE CASCADE
 );

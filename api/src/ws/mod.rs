@@ -70,33 +70,33 @@ fn flat_to_nested_quiz(flat: Vec<db::FlatQuiz>) -> api::OutgoingQuiz {
     let mut quiz = api::OutgoingQuiz {
         name: flat[0].name.clone(),
         description: flat[0].description.clone(),
-        qui_id: flat[0].qui_id,
+        quiz_id: flat[0].quiz_id,
         questions: Vec::new(),
     };
 
     let mut prev_question = &db::FlatQuiz {
-        qui_id: 0,
+        quiz_id: 0,
         name: "".into(),
         description: "".into(),
-        que_id: -1,
-        que_text: "".into(),
+        question_id: -1,
+        question_text: "".into(),
         image_url: None,
-        ans_id: 0,
-        ans_text: "".into(),
+        answer_id: 0,
+        answer_text: "".into(),
         correct: None,
     };
     let mut ptr = 0usize;
     for line in flat.iter() {
-        if prev_question.que_id != line.que_id {
+        if prev_question.question_id != line.question_id {
             quiz.questions.push(api::NewQuestion {
-                que_text: line.que_text.clone(),
+                question_text: line.question_text.clone(),
                 image_url: line.image_url.clone(),
                 answers: Vec::new(),
             });
             ptr += 1;
         }
         quiz.questions[ptr - 1].answers.push(api::NewAnswer {
-            ans_text: line.ans_text.clone(),
+            answer_text: line.answer_text.clone(),
             correct: line.correct,
         });
         prev_question = line;
@@ -115,13 +115,13 @@ pub async fn play_session(
         db::FlatQuiz,
         r#"
         SELECT 
-            a.qui_id, a.name, a.description, 
-            b.que_id, b.que_text, b.image_url, 
-            c.ans_id, c.ans_text, c.correct 
+            a.quiz_id,     a.name,          a.description, 
+            b.question_id, b.question_text, b.image_url, 
+            c.answer_id,   c.answer_text,   c.correct 
         FROM sessions d
-        INNER JOIN quizes a ON (a.qui_id = d.quiz_id)
-        INNER JOIN questions b ON (b.qui_id = a.qui_id)
-        INNER JOIN answers c ON (c.que_id = b.que_id)
+        INNER JOIN quizes a ON (a.quiz_id = d.quiz_id)
+        INNER JOIN questions b ON (b.quiz_id = a.quiz_id)
+        INNER JOIN answers c ON (c.question_id = b.question_id)
         WHERE d.session_id = $1
         "#,
         session_id
@@ -206,13 +206,13 @@ pub async fn get_quiz(req: Request<State>, mut stream: WebSocketConnection) -> t
         db::FlatQuiz,
         r#"
         SELECT 
-            a.qui_id, a.name, a.description, 
-            b.que_id, b.que_text, b.image_url, 
-            c.ans_id, c.ans_text, c.correct 
+            a.quiz_id,     a.name,          a.description, 
+            b.question_id, b.question_text, b.image_url, 
+            c.answer_id,   c.answer_text,   c.correct 
         FROM quizes a
-        INNER JOIN questions b ON (b.qui_id = a.qui_id)
-        INNER JOIN answers c ON (c.que_id = b.que_id)
-        WHERE a.qui_id = $1
+        INNER JOIN questions b ON (b.quiz_id = a.quiz_id)
+        INNER JOIN answers c ON (c.question_id = b.question_id)
+        WHERE a.quiz_id = $1
         "#,
         quiz_id
     )
@@ -243,7 +243,7 @@ async fn play_quiz(quiz: api::OutgoingQuiz, stream: &mut WebSocketConnection, pl
             .send_json(&WebsocketQuestion {
                 message_type: WebsocketMessage::Question,
                 index: idx + 1,
-                text: question.que_text.clone(),
+                text: question.question_text.clone(),
                 image_url: question.image_url.clone(),
                 alternatives: question
                     .answers
@@ -251,7 +251,7 @@ async fn play_quiz(quiz: api::OutgoingQuiz, stream: &mut WebSocketConnection, pl
                     .enumerate()
                     .map(|(i, a)| WebsocketAnswer {
                         index: i + 1,
-                        text: a.ans_text.clone(),
+                        text: a.answer_text.clone(),
                     })
                     .collect(),
             })
