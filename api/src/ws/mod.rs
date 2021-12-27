@@ -16,7 +16,8 @@ enum WebsocketMessage {
     PlayerResults,
     NameRequest,
     PlayerList,
-    GameStarted,
+    GameAlreadyStarted,
+    Start,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -153,6 +154,37 @@ pub async fn request_name(stream: &mut WebSocketConnection) -> tide::Result<Stri
     Ok("blah".into())
 }
 
+pub async fn send_player_info(stream: &mut WebSocketConnection, session_id: i32, pool: &PgPool) -> tide::Result<()> {
+    let players = db::get_session_players(session_id, pool).await?;
+    stream.send_json(&WebsocketPlayerList {
+        message_type: WebsocketMessage::PlayerList,
+        players: players
+    }).await?;
+    Ok(())
+}
+
+pub async fn wait_for_start(session_id: i32, stream: &mut WebSocketConnection, pool: &PgPool) -> tide::Result<()> {
+    let two_seconds = time::Duration::from_secs(2);
+    loop {
+        send_player_info(stream, session_id, pool).await?;
+        let resp = future::timeout(two_seconds, async {
+            let start = match stream.next().await {
+                Some(Ok(Message::Text(input))) => Some(serde_json::from_str::<WebsocketStatus>(&input).unwrap()),
+                _ => None,
+            };
+
+            if let Some(_) = start {
+                db::start_session(session_id, pool).await.unwrap();
+            }
+        }).await;
+
+        if resp.is_ok() { // this means that we didn't hit the timeout
+            break;
+        }
+    }
+    Ok(())
+}
+
 pub async fn new_session(
     req: Request<State>,
     mut stream: WebSocketConnection,
@@ -165,16 +197,13 @@ pub async fn new_session(
     db::set_player_name(player.player_id, name.clone(), &req.state().pool).await?;
     player.name = name;
 
-    stream.send_string(format!("Welcome {}", player.name)).await?;
+    wait_for_start(session.session_id, &mut stream, &req.state().pool).await?;
 
-    loop {
-        let players = db::get_session_players(session.session_id, &req.state().pool).await?;
-        stream.send_json(&WebsocketPlayerList {
-            message_type: WebsocketMessage::PlayerList,
-            players: players
-        }).await?;
-        break;
-    }
+    stream.send_json(&WebsocketStatus{
+        message_type: WebsocketMessage::Start
+    }).await?;
+
+    play_session(&mut stream, &req.state().pool, player, session).await?;
 
     Ok(())
 }
@@ -185,11 +214,11 @@ pub async fn join_session(
 ) -> tide::Result<()> {
     let session_id: i32 = req.param("s")?.parse()?;
 
-    let session = db::get_session(session_id, &req.state().pool).await?;
+    let mut session = db::get_session(session_id, &req.state().pool).await?;
 
     if session.started {
         stream.send_json(&WebsocketStatus {
-            message_type: WebsocketMessage::GameStarted,
+            message_type: WebsocketMessage::GameAlreadyStarted,
         }).await?;
         stream.send(Message::Close(None)).await?;
         return Ok(());
@@ -200,16 +229,27 @@ pub async fn join_session(
     db::set_player_name(player.player_id, name.clone(), &req.state().pool).await?;
     player.name = name;
 
+    while !session.started {
+        session = db::get_session(session_id, &req.state().pool).await?;
+        send_player_info(&mut stream, session_id, &req.state().pool).await?;
+        thread::sleep(time::Duration::from_secs(2));
+    }
+
+    stream.send_json(&WebsocketStatus{
+        message_type: WebsocketMessage::Start
+    }).await?;
+
+    play_session(&mut stream, &req.state().pool, player, session).await?;
+
     Ok(())
 }
 
 pub async fn play_session(
-    req: Request<State>,
-    mut stream: WebSocketConnection,
+    stream: &mut WebSocketConnection,
+    pool: &PgPool,
+    player: db::Player,
+    session: db::Session,
 ) -> tide::Result<()> {
-    let session_id: i32 = req.param("s")?.parse()?;
-    let name: String = req.param("n")?.to_string();
-
     let flat_quiz = sqlx::query_as!(
         db::FlatQuiz,
         r#"
@@ -223,9 +263,9 @@ pub async fn play_session(
         INNER JOIN answers c ON (c.question_id = b.question_id)
         WHERE d.session_id = $1
         "#,
-        session_id
+        session.session_id
     )
-    .fetch_all(&req.state().pool)
+    .fetch_all(pool)
     .await?;
 
     let quiz = flat_to_nested_quiz(flat_quiz);
@@ -238,46 +278,13 @@ pub async fn play_session(
             num_questions: quiz.questions.len(),
         })
         .await?;
-    let player = sqlx::query_as!(
-        db::Player,
-        r#"
-        SELECT * FROM players WHERE session_id = $1 AND name = $2
-        "#,
-        session_id,
-        name
-    )
-    .fetch_optional(&req.state().pool)
-    .await?;
 
-    
-    if player.is_none() {
-        let new_player = sqlx::query_as!(
-            db::Player,
-            r#"
-        INSERT INTO players (session_id, score, name)
-        VALUES ($1, 0, $2)
-        RETURNING player_id, session_id, score, finished, name, host
-        "#,
-            session_id,
-            name
-        )
-        .fetch_one(&req.state().pool)
-        .await?;
+    play_quiz(quiz, stream, Some(&player), Some(pool)).await?;
 
-        play_quiz(quiz, &mut stream, Some(&new_player), Some(&req.state().pool)).await?;
+    db::set_finished(player.player_id, pool).await?;
 
-        db::set_finished(new_player.player_id, &req.state().pool).await?;
-    }
     loop {
-        let players = sqlx::query_as!(
-            db::Player,
-            r#"
-            SELECT * FROM players WHERE session_id = $1
-            "#,
-            session_id
-        )
-        .fetch_all(&req.state().pool)
-        .await?;
+        let players = db::get_session_players(session.session_id, pool).await?;
 
         let completed = players.iter().all(|p| p.finished);
         stream

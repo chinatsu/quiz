@@ -77,6 +77,17 @@ pub async fn set_finished(player_id: i32, pool: &PgPool) -> tide::Result<()> {
     Ok(())
 }
 
+
+pub async fn start_session(session_id: i32, pool: &PgPool) -> tide::Result<()> {
+    sqlx::query!(
+        "UPDATE sessions SET started = true WHERE session_id = $1",
+        session_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
 pub async fn set_player_name(player_id: i32, name: String, pool: &PgPool) -> tide::Result<()> {
     sqlx::query!(
         "UPDATE players SET name = $1 WHERE player_id = $2",
