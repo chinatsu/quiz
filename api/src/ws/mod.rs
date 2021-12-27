@@ -1,5 +1,6 @@
 use crate::{api, db, State};
 use async_std::prelude::*;
+use async_std::future;
 use std::{thread, time};
 use sqlx::postgres::PgPool;
 use tide::prelude::*;
@@ -13,6 +14,9 @@ enum WebsocketMessage {
     Result,
     End,
     PlayerResults,
+    NameRequest,
+    PlayerList,
+    GameStarted,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -66,6 +70,22 @@ struct WebsocketAnswer {
     text: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketStatus {
+    message_type: WebsocketMessage
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketNameResponse {
+    name: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebsocketPlayerList {
+    message_type: WebsocketMessage,
+    players: Vec<db::Player>
+}
+
 fn flat_to_nested_quiz(flat: Vec<db::FlatQuiz>) -> api::OutgoingQuiz {
     let mut quiz = api::OutgoingQuiz {
         name: flat[0].name.clone(),
@@ -102,6 +122,85 @@ fn flat_to_nested_quiz(flat: Vec<db::FlatQuiz>) -> api::OutgoingQuiz {
         prev_question = line;
     }
     quiz
+}
+
+pub async fn request_name(stream: &mut WebSocketConnection) -> tide::Result<String> {
+    stream.send_json(&WebsocketStatus {
+        message_type: WebsocketMessage::NameRequest
+    }).await?;
+
+    let five_minutes = time::Duration::from_secs(5*60);
+
+    let resp = future::timeout(five_minutes, async {
+        match stream.next().await {
+            Some(Ok(Message::Text(input))) => Some(serde_json::from_str::<WebsocketNameResponse>(&input).ok()?),
+            _ => None,
+        }
+    }).await;
+
+    if resp.is_ok() {
+        if let Some(response) = resp? {
+            return Ok(response.name)
+        } 
+    }
+
+    let mut gen = names::Generator::default();
+    if let Some(name) = gen.next() {
+        return Ok(name);
+    }
+
+    // i never expect to come down here tbh
+    Ok("blah".into())
+}
+
+pub async fn new_session(
+    req: Request<State>,
+    mut stream: WebSocketConnection,
+) -> tide::Result<()> {
+    let quiz_id: i32 = req.param("q")?.parse()?;
+
+    let (session, mut player) = db::new_session(quiz_id, &req.state().pool).await?;
+
+    let name = request_name(&mut stream).await?;
+    db::set_player_name(player.player_id, name.clone(), &req.state().pool).await?;
+    player.name = name;
+
+    stream.send_string(format!("Welcome {}", player.name)).await?;
+
+    loop {
+        let players = db::get_session_players(session.session_id, &req.state().pool).await?;
+        stream.send_json(&WebsocketPlayerList {
+            message_type: WebsocketMessage::PlayerList,
+            players: players
+        }).await?;
+        break;
+    }
+
+    Ok(())
+}
+
+pub async fn join_session(
+    req: Request<State>,
+    mut stream: WebSocketConnection,
+) -> tide::Result<()> {
+    let session_id: i32 = req.param("s")?.parse()?;
+
+    let session = db::get_session(session_id, &req.state().pool).await?;
+
+    if session.started {
+        stream.send_json(&WebsocketStatus {
+            message_type: WebsocketMessage::GameStarted,
+        }).await?;
+        stream.send(Message::Close(None)).await?;
+        return Ok(());
+    }
+    
+    let mut player = db::new_player(session.session_id, &req.state().pool).await?;
+    let name = request_name(&mut stream).await?;
+    db::set_player_name(player.player_id, name.clone(), &req.state().pool).await?;
+    player.name = name;
+
+    Ok(())
 }
 
 pub async fn play_session(
@@ -157,7 +256,7 @@ pub async fn play_session(
             r#"
         INSERT INTO players (session_id, score, name)
         VALUES ($1, 0, $2)
-        RETURNING player_id, session_id, score, finished, name
+        RETURNING player_id, session_id, score, finished, name, host
         "#,
             session_id,
             name

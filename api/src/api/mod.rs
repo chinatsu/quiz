@@ -37,7 +37,7 @@ pub async fn new_session(req: Request<State>) -> tide::Result {
         r#"
         INSERT INTO sessions (quiz_id)
         VALUES ($1)
-        RETURNING session_id, quiz_id
+        RETURNING session_id, quiz_id, started
         "#,
         quiz_id
     )
@@ -51,7 +51,7 @@ pub async fn list_sessions(req: Request<State>) -> tide::Result {
     let sessions = sqlx::query_as!(
         db::Session,
         r#"
-        SELECT DISTINCT s.session_id, s.quiz_id FROM sessions s
+        SELECT DISTINCT s.session_id, s.quiz_id, s.started FROM sessions s
         INNER JOIN players p ON p.session_id = s.session_id
         WHERE p.finished = 'false'
         "#
