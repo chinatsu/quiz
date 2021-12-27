@@ -18,6 +18,7 @@ enum WebsocketMessage {
     PlayerList,
     GameAlreadyStarted,
     Start,
+    SessionInfo,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -82,9 +83,15 @@ struct WebsocketNameResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+struct WebsocketSessionInfo {
+    message_type: WebsocketMessage,
+    session_id: i32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct WebsocketPlayerList {
     message_type: WebsocketMessage,
-    players: Vec<db::Player>
+    players: Vec<db::Player>,
 }
 
 fn flat_to_nested_quiz(flat: Vec<db::FlatQuiz>) -> api::OutgoingQuiz {
@@ -193,6 +200,11 @@ pub async fn new_session(
 
     let (session, mut player) = db::new_session(quiz_id, &req.state().pool).await?;
 
+    stream.send_json(&WebsocketSessionInfo {
+        message_type: WebsocketMessage::SessionInfo,
+        session_id: session.session_id
+    }).await?;
+
     let name = request_name(&mut stream).await?;
     db::set_player_name(player.player_id, name.clone(), &req.state().pool).await?;
     player.name = name;
@@ -225,6 +237,11 @@ pub async fn join_session(
         stream.send(Message::Close(None)).await?;
         return Ok(());
     }
+
+    stream.send_json(&WebsocketSessionInfo {
+        message_type: WebsocketMessage::SessionInfo,
+        session_id: session.session_id
+    }).await?;
     
     let mut player = db::new_player(session.session_id, &req.state().pool).await?;
     let name = request_name(&mut stream).await?;
