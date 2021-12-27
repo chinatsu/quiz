@@ -212,6 +212,8 @@ pub async fn join_session(
     req: Request<State>,
     mut stream: WebSocketConnection,
 ) -> tide::Result<()> {
+    // todo: make it possible to pick up a session as a player on refresh
+    // people seem to accidentally refresh sometimes, and then they're kicked out :(
     let session_id: i32 = req.param("s")?.parse()?;
 
     let mut session = db::get_session(session_id, &req.state().pool).await?;
@@ -228,6 +230,8 @@ pub async fn join_session(
     let name = request_name(&mut stream).await?;
     db::set_player_name(player.player_id, name.clone(), &req.state().pool).await?;
     player.name = name;
+
+    send_player_info(&mut stream, session_id, &req.state().pool).await?;
 
     while !session.started {
         session = db::get_session(session_id, &req.state().pool).await?;
