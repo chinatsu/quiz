@@ -30,45 +30,59 @@ const Quiz = () => {
 
 
   useEffect(() => {
-    console.log(lastMessage?.data);
     if (lastMessage !== null) {
         if (lastMessage.data === "This is supposed to never happen") {
           return;
         }
         let object = JSON.parse(lastMessage.data);
-        if (object.message_type === "Quiz") {
-            setTitle(object.name);
-            setDescription(object.description);
-            setTotal(object.num_questions);
-            setEnded(false);
-            setCurrentPlayerResults(null);
-            setPlayers([]);
-        } else if (object.message_type === "Question") {
-            setCorrectAnswers([]);
-            setAnswered(false);
-            setCurrentQuestion(object);
-        } else if (object.message_type === "Result") {
-            setScore(object.score);
-            setCorrectAnswers(object.correct_answers);
-        } else if (object.message_type === "End") {
-            setCurrentQuestion(null);
-            setEnded(true);
-        } else if (object.message_type === "PlayerResults") {
-            setCurrentPlayerResults(object);
-        } else if (object.message_type == "NameRequest") {
-            setPlayers([]);
-            setNameNeeded(true);
-        } else if (object.message_type == "PlayerList") {
-            setPlayers(object.players)
-        } else if (object.message_type == "SessionInfo") {
-            setSessionId(object.session_id)
+        switch (object.message_type) {
+            case "Quiz": {
+                setTitle(object.name);
+                setDescription(object.description);
+                setTotal(object.num_questions);
+                setEnded(false);
+                setCurrentPlayerResults(null);
+                setPlayers([]);
+                break;
+            }
+            case "Question": {
+                setCorrectAnswers([]);
+                setAnswered(false);
+                setCurrentQuestion(object);
+                break;    
+            }
+            case "Result": {
+                setScore(object.score);
+                setCorrectAnswers(object.correct_answers);
+                break;    
+            }
+            case "End": {
+                setCurrentQuestion(null);
+                setEnded(true);
+                break;        
+            }
+            case "NameRequest": {
+                setPlayers([]);
+                setNameNeeded(true);
+                break;    
+            }
+            case "PlayerList": {
+                setPlayers(object.players);
+                break;   
+            }
+            case "SessionInfo": {
+                setSessionId(object.session_id);
+                break;
+            }
+            default: {
+                console.log("Unimplemented: " + JSON.stringify(object))
+            }
         }
     }
   }, [lastMessage]);
 
   const handleAnswer = (index: number, answer: number) => {
     setAnswered(true);
-    console.log(answered);
     sendMessage(JSON.stringify({index, answer}));
   }
 
