@@ -29,36 +29,30 @@ pub struct OutgoingQuiz {
     pub questions: Vec<NewQuestion>,
 }
 
-pub async fn new_session(req: Request<State>) -> tide::Result {
-    let quiz_id: i32 = req.param("q")?.parse()?;
-
-    let new_session = sqlx::query_as!(
-        db::Session,
-        r#"
-        INSERT INTO sessions (quiz_id)
-        VALUES ($1)
-        RETURNING session_id, quiz_id, started
-        "#,
-        quiz_id
-    )
-    .fetch_one(&req.state().pool)
-    .await?;
-
-    Ok(json!(new_session).into())
-}
-
 pub async fn list_sessions(req: Request<State>) -> tide::Result {
     let sessions = sqlx::query_as!(
         db::Session,
         r#"
-        SELECT DISTINCT s.session_id, s.quiz_id, s.started FROM sessions s
-        INNER JOIN players p ON p.session_id = s.session_id
-        WHERE p.finished = 'false'
+        SELECT * FROM sessions
+        WHERE started = false
         "#
     )   .fetch_all(&req.state().pool)
         .await?;
 
     Ok(json!(sessions).into())
+}
+
+pub async fn list_quizes(req: Request<State>) -> tide::Result {
+    let quizes = sqlx::query_as!(
+        db::Quiz,
+        r#"
+        SELECT * FROM quizes
+        "#
+    )
+        .fetch_all(&req.state().pool)
+        .await?;
+
+    Ok(json!(quizes).into())
 }
 
 pub async fn create_quiz(mut req: Request<State>) -> tide::Result {

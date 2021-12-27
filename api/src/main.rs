@@ -39,6 +39,7 @@ async fn main() -> tide::Result<()> {
     app.at("/session/:s")
         .get(WebSocket::new(ws::join_session));
     app.at("/sessions").get(api::list_sessions);
+    app.at("/quizes").get(api::list_quizes);
     app.at("/session/new/:q").get(WebSocket::new(ws::new_session));
     app.listen("0.0.0.0:3001").await?;
     Ok(())

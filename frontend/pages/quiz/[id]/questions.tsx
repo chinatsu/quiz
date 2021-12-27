@@ -55,7 +55,7 @@ const Questions = () => {
             <h3>Add answer to above question</h3>
             <form onSubmit={handleNewAnswer}>
                 <TextField label="Text" id="ans_text" name="ans_text" autoComplete="off" required />
-                <RadioGroup legend="Correct" id="correct" default="false" name="correct" autoComplete="off" required>
+                <RadioGroup legend="Correct" id="correct" name="correct" autoComplete="off" required>
                     <Radio value="true">True</Radio>
                     <Radio value="false">False</Radio>
                 </RadioGroup>
