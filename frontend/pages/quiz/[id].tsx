@@ -20,7 +20,7 @@ const Quiz = () => {
   const {
     sendMessage,
     lastMessage,
-  } = useWebSocket(`ws://192.168.188.66:3001/quiz/${id}`);
+  } = useWebSocket(`ws://localhost:3001/quiz/${id}`);
 
 
   useEffect(() => {

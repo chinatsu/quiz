@@ -19,10 +19,10 @@ const QuizIndex = () => {
   }
 
   useEffect(() => {
-    fetch(`http://192.168.188.66:3001/quizes`)
+    fetch(`http://localhost:3001/quizes`)
       .then(res => res.json())
       .then(data => setQuizes(data))
-    fetch(`http://192.168.188.66:3001/sessions`)
+    fetch(`http://localhost:3001/sessions`)
       .then(res => res.json())
       .then(data => setSessions(data))
     

@@ -16,7 +16,7 @@ const NewQuiz = () => {
                 description: ev.target.description.value
             })
         }
-        fetch('http://192.168.188.66:3001/create/quiz', requestOptions)
+        fetch('http://localhost:3001/create/quiz', requestOptions)
             .then(res => res.json())
             .then(data => setQuiz(data))
     }

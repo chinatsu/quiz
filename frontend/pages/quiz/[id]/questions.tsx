@@ -23,7 +23,7 @@ const Questions = () => {
                 answers: answers
             })
         }
-        fetch(`http://192.168.188.66:3001/create/quiz/${id}/question`, requestOptions)
+        fetch(`http://localhost:3001/create/quiz/${id}/question`, requestOptions)
             .then(res => res.json())
             .then(data => setQuestion(data))
     }
